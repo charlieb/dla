@@ -20,9 +20,9 @@ def check_collision(nparts, parts, new_part):
                 hit = i
     return hit
 
-@jit((int64, float64[:,:], float64, float64))
-def add_particle(nparts, parts, particle_radius, start_radius):
-    angle = 2*pi * random()
+@jit((int64, float64[:,:], float64, float64, float64, float64))
+def add_particle(nparts, parts, particle_radius, start_radius, start_angle_range, start_angle_range_center):
+    angle = start_angle_range_center + (start_angle_range / 2)  - start_angle_range * random()
     pos = np.array([start_radius * cos(angle),
                     start_radius * sin(angle),
                     particle_radius, 0.])
@@ -55,8 +55,9 @@ def add_particle(nparts, parts, particle_radius, start_radius):
     parts[nparts][2] = particle_radius
     parts[nparts][3] = hit_particle # NB the last particle we detect a hit on is the link
 
-@jit(int64(int64, float64[:,:], float64, float64))
-def generate_dla(array_len, parts, particle_radius, radius_multiplier):
+@jit(int64(int64, float64[:,:], float64, float64, float64, float64))
+def generate_dla(array_len, parts, particle_radius, radius_multiplier,
+                start_angle_range, start_angle_range_center):
     nparts = 1
     parts[0][0] = parts[0][1] = 0.
     parts[0][2] = particle_radius
@@ -64,7 +65,9 @@ def generate_dla(array_len, parts, particle_radius, radius_multiplier):
 
     for _ in range(array_len-1):
         particle_radius *= radius_multiplier
-        add_particle(nparts, parts, particle_radius, radius)
+        start_angle_range_center += pi / 2 / array_len
+        add_particle(nparts, parts, particle_radius, radius,
+                    start_angle_range, start_angle_range_center)
         r = sqrt(parts[nparts][0]*parts[nparts][0] +
                  parts[nparts][1]*parts[nparts][1])
         if r + 4*particle_radius > radius:
@@ -99,9 +102,10 @@ def draw(nparts, parts, frame=0, circles=True, links=True):
                 width=maxx-minx+2*line_width, height=maxy-miny+2*line_width)
     dwg.save()
 
-def generate_particles(nparticles, particle_radius, radius_multiplier):
+def generate_particles(nparticles, particle_radius, radius_multiplier, start_angle_range=2*pi, start_angle_range_center=0.):
     parts = np.zeros((nparticles, 4), dtype=np.float64)
-    nparts = generate_dla(nparticles, parts, particle_radius, radius_multiplier)
+    nparts = generate_dla(nparticles, parts, particle_radius, radius_multiplier,
+                        start_angle_range, start_angle_range_center)
     return parts
 
 def unpack(particle):
@@ -113,9 +117,10 @@ def unpack(particle):
             }
 
 def main():
-    nparts = 5000
-    parts = generate_particles(nparts, 2., 0.9995)
-    draw(nparts, parts, circles=False, links=True)
+    nparts = 3000
+    #parts = generate_particles(nparts, 2., 1.-1/(nparts*0.7), start_angle_range=pi/4)
+    parts = generate_particles(nparts, 1., 1., start_angle_range=pi/4)
+    draw(nparts, parts, circles=True, links=True)
 
 if __name__ == '__main__':
     t0 = time.time()
