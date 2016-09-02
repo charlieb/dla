@@ -2,7 +2,7 @@ from math import sqrt, sin, cos, radians, pi, isnan
 from random import choice, random, randrange
 import numpy as np
 from numba import jit, int64, float64, boolean
-import svgwrite
+import svgwrite as svg
 import time
 
 @jit(int64(int64, float64[:,:], float64[:]))
@@ -65,7 +65,7 @@ def generate_dla(array_len, parts, particle_radius, radius_multiplier,
 
     for _ in range(array_len-1):
         particle_radius *= radius_multiplier
-        start_angle_range_center += pi / 2 / array_len
+        #start_angle_range_center += pi / array_len
         add_particle(nparts, parts, particle_radius, radius,
                     start_angle_range, start_angle_range_center)
         r = sqrt(parts[nparts][0]*parts[nparts][0] +
@@ -76,37 +76,46 @@ def generate_dla(array_len, parts, particle_radius, radius_multiplier,
         print(nparts)
     return nparts
 
-def draw(nparts, parts, frame=0, circles=True, links=True):
-    dwg = svgwrite.Drawing('test%05i.svg'%frame, profile='tiny')
+def draw(parts, drawing, circles=True, links=True, circle_color='black', link_color='red', line_width=1., prune=[]):
     minx = miny =  9999999
     maxx = maxy = -9999999
-    line_width = 0.1
-    for i in range(nparts):
-        minx = parts[i][0] - parts[i][2] if parts[i][0] - parts[i][2] < minx else minx
-        maxx = parts[i][0] + parts[i][2] if parts[i][0] + parts[i][2] > maxx else maxx
-        miny = parts[i][1] - parts[i][2] if parts[i][1] - parts[i][2] < miny else miny
-        maxy = parts[i][1] + parts[i][2] if parts[i][1] + parts[i][2] > maxy else maxy
+    for i, p in enumerate(parts):
+        minx = p[0] - p[2] if p[0] - p[2] < minx else minx
+        maxx = p[0] + p[2] if p[0] + p[2] > maxx else maxx
+        miny = p[1] - p[2] if p[1] - p[2] < miny else miny
+        maxy = p[1] + p[2] if p[1] + p[2] > maxy else maxy
 
-        if circles:
-            c = svgwrite.shapes.Circle((parts[i][0], parts[i][1]), parts[i][2],
-                                        fill='none', stroke='black', stroke_width=line_width)
-            dwg.add(c)
+        if circles and i not in prune:
+            c = svg.shapes.Circle((p[0], p[1]), p[2],
+                                        fill='none', 
+                                        stroke=circle_color,
+                                        stroke_width=line_width)
+            drawing.add(c)
 
         if links:
-            link = svgwrite.shapes.Line((parts[i][0], parts[i][1]),
-                                        (parts[int(parts[i][3])][0], parts[int(parts[i][3])][1]),
-                                        stroke='red', stroke_width=line_width)
-            dwg.add(link)
+            link = svg.shapes.Line((p[0], p[1]),
+                                        (parts[int(p[3])][0], parts[int(p[3])][1]),
+                                        stroke=link_color,
+                                        stroke_width=line_width)
+            drawing.add(link)
 
-    dwg.viewbox(minx=minx-line_width, miny=miny-line_width, 
+    drawing.viewbox(minx=minx-line_width, miny=miny-line_width, 
                 width=maxx-minx+2*line_width, height=maxy-miny+2*line_width)
-    dwg.save()
 
 def generate_particles(nparticles, particle_radius, radius_multiplier, start_angle_range=2*pi, start_angle_range_center=0.):
     parts = np.zeros((nparticles, 4), dtype=np.float64)
     nparts = generate_dla(nparticles, parts, particle_radius, radius_multiplier,
                         start_angle_range, start_angle_range_center)
     return parts
+
+def find_leaves(particles):
+    leaves = list(range(len(particles)))
+    for p in particles:
+        try:
+            leaves.remove(p[3])
+        except ValueError:
+            pass
+    return leaves
 
 def unpack(particle):
     return {
@@ -117,10 +126,13 @@ def unpack(particle):
             }
 
 def main():
-    nparts = 3000
+    nparts = 1000
     #parts = generate_particles(nparts, 2., 1.-1/(nparts*0.7), start_angle_range=pi/4)
-    parts = generate_particles(nparts, 1., 1., start_angle_range=pi/4)
-    draw(nparts, parts, circles=True, links=True)
+    parts = generate_particles(nparts, 1., 0.999, start_angle_range_center=3*pi/2, start_angle_range=pi/3)
+
+    dwg = svg.Drawing('test.svg')
+    draw(parts, dwg, circles=True, links=True, line_width=0.1)
+    dwg.save()
 
 if __name__ == '__main__':
     t0 = time.time()
