@@ -5,6 +5,8 @@ from numba import jit, int64, float64, boolean
 import svgwrite as svg
 import time
 
+from functools import reduce
+
 @jit(int64(int64, float64[:,:], float64[:]))
 def check_collision(nparts, parts, new_part):
     hit = -1
@@ -102,6 +104,68 @@ def draw(parts, drawing, circles=True, links=True, circle_color='black', link_co
     drawing.viewbox(minx=minx-line_width, miny=miny-line_width, 
                 width=maxx-minx+2*line_width, height=maxy-miny+2*line_width)
 
+def sequential_paths(parts):
+    visited = [False]*len(parts)
+    sequences = []
+    for leaf in find_leaves(parts):
+        seq = [leaf]
+        twig = int(leaf)
+        while twig not in visited:
+            visited.append(twig)
+            twig = int(parts[twig][3])
+            seq.append(twig)
+        sequences.append(seq)
+    return sequences
+
+def gcode(parts, filename, sizex, sizey, circles=True, links=True, prune=[]):
+    header = ['%',
+            'G21 (All units in mm)',
+            'G90 (All absolute moves)',
+            ]
+    footer = ['G00 X0.0 Y 0.0 Z0.0',
+            'M2',
+            '%',
+            ]
+    paths = sequential_paths(parts)
+
+    minx = miny =  9999999
+    maxx = maxy = -9999999
+    for p in parts:
+        minx = p[0] - p[2] if p[0] - p[2] < minx else minx
+        maxx = p[0] + p[2] if p[0] + p[2] > maxx else maxx
+        miny = p[1] - p[2] if p[1] - p[2] < miny else miny
+        maxy = p[1] + p[2] if p[1] + p[2] > maxy else maxy
+
+    sclx = sizex / (maxx - minx)
+    scly = sizey / (maxy - miny)
+    scl = min(sclx, scly)
+    print(minx, maxx, maxx-minx, sclx, scly)
+
+    body = []
+    for path in paths:
+        body.append('G01 Z15 F5000')
+        first = True
+        for i in path:
+            xy = ' X ' + format((parts[i][0] - minx) * scl, '.4f') + \
+                 ' Y ' + format((parts[i][1] - miny) * scl, '.4f')
+            if first:
+                body.append('G01' + xy + ' F5000') # should be G00 but firware ignores F
+                body.append('G01 Z34 F5000')
+                first = False
+            else:
+                body.append('G01' + xy + ' F5000')
+
+    if circles:
+        for i, part in enumerate(parts):
+            if i not in prune:
+                xy = ' X ' + format((part[0] - minx) * scl, '.4f') + \
+                     ' Y ' + format((part[1] - miny) * scl, '.4f')
+                body.append('G02 ' + xy +
+                            ' I' + format(part[2] * scl, '.4f') +
+                            ' J' + format(part[2] * scl, '.4f') + ' F5000')
+
+    return '\n'.join(header + body + footer)
+
 def generate_particles(nparticles, particle_radius, radius_multiplier, start_angle_range=2*pi, start_angle_range_center=0.):
     parts = np.zeros((nparticles, 4), dtype=np.float64)
     nparts = generate_dla(nparticles, parts, particle_radius, radius_multiplier,
@@ -126,12 +190,17 @@ def unpack(particle):
             }
 
 def main():
-    nparts = 1000
+    nparts = 2000
     #parts = generate_particles(nparts, 2., 1.-1/(nparts*0.7), start_angle_range=pi/4)
     parts = generate_particles(nparts, 1., 0.999, start_angle_range_center=3*pi/2, start_angle_range=pi/3)
 
+    paths = gcode(parts, '', 200.0, 200.0, circles=False)
+    with open('test.cnc', 'w') as f:
+        f.write(paths)
+    return
+
     dwg = svg.Drawing('test.svg')
-    draw(parts, dwg, circles=True, links=True, line_width=0.1)
+    draw(parts, dwg, circles=False, links=True, line_width=0.1)
     dwg.save()
 
 if __name__ == '__main__':
