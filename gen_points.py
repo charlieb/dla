@@ -107,7 +107,9 @@ def draw(parts, drawing, circles=True, links=True, circle_color='black', link_co
 def sequential_paths(parts):
     visited = [False]*len(parts)
     sequences = []
-    for leaf in find_leaves(parts):
+    # reversed because it will start with the furthest out paths
+    # which are the longest leading to a more efficient toolpath
+    for leaf in reversed(find_leaves(parts)):
         seq = [leaf]
         twig = int(leaf)
         while twig not in visited:
@@ -156,16 +158,17 @@ def gcode(parts, filename, sizex, sizey, circles=True, links=True, prune=[]):
                 body.append('G01' + xy + ' F5000')
 
     if circles:
-        for i, part in enumerate(parts):
-            if i not in prune:
-                body.append('G01 Z15 F5000')
-                xy = ' X ' + format((part[0] - minx - part[2]) * scl, '.4f') + \
-                     ' Y ' + format((part[1] - miny) * scl, '.4f')
-                body.append('G01' + xy + ' F5000')
-                body.append('G01 Z34 F5000')
-                body.append('G02' + xy +
-                            ' I' + format(part[2] * scl, '.4f') +
-                            ' J0 F5000')
+        for path in paths:
+            for i in path:
+                if i not in prune:
+                    body.append('G01 Z15 F5000')
+                    xy = ' X ' + format((parts[i][0] - minx - parts[i][2]) * scl, '.4f') + \
+                         ' Y ' + format((parts[i][1] - miny) * scl, '.4f')
+                    body.append('G01' + xy + ' F5000')
+                    body.append('G01 Z34 F5000')
+                    body.append('G02' + xy +
+                                ' I' + format(parts[i][2] * scl, '.4f') +
+                                ' J0 F5000')
 
     return '\n'.join(header + body + footer)
 
@@ -193,7 +196,7 @@ def unpack(particle):
             }
 
 def main():
-    nparts = 1000
+    nparts = 200
     #parts = generate_particles(nparts, 2., 1.-1/(nparts*0.7), start_angle_range=pi/4)
     parts = generate_particles(nparts, 1., 0.999, start_angle_range_center=3*pi/2, start_angle_range=pi/3)
 
