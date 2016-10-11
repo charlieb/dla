@@ -145,30 +145,30 @@ def gcode(parts, filename, sizex, sizey, circles=True, links=True, prune=[]):
 
     body = []
     for path in paths:
-        body.append('G01 Z15 F5000')
+        body.append('G01 Z15 F10000')
         first = True
         for i in path:
             xy = ' X ' + format((parts[i][0] - minx) * scl, '.4f') + \
                  ' Y ' + format((parts[i][1] - miny) * scl, '.4f')
             if first:
-                body.append('G01' + xy + ' F5000') # should be G00 but firware ignores F
-                body.append('G01 Z34 F5000')
+                body.append('G01' + xy + ' F10000') # should be G00 but firware ignores F
+                body.append('G01 Z34 F10000')
                 first = False
             else:
-                body.append('G01' + xy + ' F5000')
+                body.append('G01' + xy + ' F10000')
 
     if circles:
         for path in paths:
             for i in path:
                 if i not in prune:
-                    body.append('G01 Z15 F5000')
+                    body.append('G01 Z15 F10000')
                     xy = ' X ' + format((parts[i][0] - minx - parts[i][2]) * scl, '.4f') + \
                          ' Y ' + format((parts[i][1] - miny) * scl, '.4f')
-                    body.append('G01' + xy + ' F5000')
-                    body.append('G01 Z34 F5000')
+                    body.append('G01' + xy + ' F10000')
+                    body.append('G01 Z34 F10000')
                     body.append('G02' + xy +
                                 ' I' + format(parts[i][2] * scl, '.4f') +
-                                ' J0 F5000')
+                                ' J0 F10000')
 
     return '\n'.join(header + body + footer)
 
