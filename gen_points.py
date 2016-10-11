@@ -158,11 +158,14 @@ def gcode(parts, filename, sizex, sizey, circles=True, links=True, prune=[]):
     if circles:
         for i, part in enumerate(parts):
             if i not in prune:
-                xy = ' X ' + format((part[0] - minx) * scl, '.4f') + \
+                body.append('G01 Z15 F5000')
+                xy = ' X ' + format((part[0] - minx - part[2]) * scl, '.4f') + \
                      ' Y ' + format((part[1] - miny) * scl, '.4f')
-                body.append('G02 ' + xy +
+                body.append('G01' + xy + ' F5000')
+                body.append('G01 Z34 F5000')
+                body.append('G02' + xy +
                             ' I' + format(part[2] * scl, '.4f') +
-                            ' J' + format(part[2] * scl, '.4f') + ' F5000')
+                            ' J0 F5000')
 
     return '\n'.join(header + body + footer)
 
@@ -190,11 +193,11 @@ def unpack(particle):
             }
 
 def main():
-    nparts = 2000
+    nparts = 1000
     #parts = generate_particles(nparts, 2., 1.-1/(nparts*0.7), start_angle_range=pi/4)
     parts = generate_particles(nparts, 1., 0.999, start_angle_range_center=3*pi/2, start_angle_range=pi/3)
 
-    paths = gcode(parts, '', 200.0, 200.0, circles=False)
+    paths = gcode(parts, '', 200.0, 200.0, circles=True)
     with open('test.cnc', 'w') as f:
         f.write(paths)
     return
